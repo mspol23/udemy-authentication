@@ -2,8 +2,8 @@ require('dotenv').config(); // call .env
 const express = require("express");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption"); // call mongoose-encryption.
-
+const md5 = require('md5'); // md5 hash.
+ 
 const app = express()
 
 app.set("view engine", "ejs")
@@ -27,10 +27,6 @@ async function main() {
             }
     });
 
-    // ---- mongoose plugin association with schema, 
-    // combined with dotenv variable. ----
-    userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]})
-
     const User = mongoose.model("User", userSchema);
     
     app.get("/", (req, res) => {
@@ -43,7 +39,7 @@ async function main() {
     
     app.post("/register", async (req, res) => {
         const user = req.body.username;
-        const pass = req.body.password;
+        const pass = md5(req.body.password); // md5 hash
 
         const [checkUser] = await User.find({username: user});
         console.log(checkUser);
@@ -68,7 +64,7 @@ async function main() {
 
     app.post("/login", async (req, res) => {
         const myUser = req.body.username;
-        const myPassword = req.body.password;
+        const myPassword = md5(req.body.password); // md5 hash.
 
         const [callUser] = await User.find({username: myUser});
         console.log(callUser);
