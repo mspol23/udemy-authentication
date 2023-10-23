@@ -17,6 +17,9 @@
               <label for="password">Password</label>
               <input type="password" class="form-control" name="password">
             </div>
+            <% if (locals.checkUser) { %>
+              <p><small>This e-mail already exist.</small></p>
+            <% } %>
             <button type="submit" class="btn btn-dark">Register</button>
           </form>
 
