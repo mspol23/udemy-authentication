@@ -1,8 +1,8 @@
-require('dotenv').config();
+require('dotenv').config(); // call .env
 const express = require("express");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
+const encrypt = require("mongoose-encryption"); // call mongoose-encryption.
 
 const app = express()
 
@@ -27,6 +27,8 @@ async function main() {
             }
     });
 
+    // ---- mongoose plugin association with schema, 
+    // combined with dotenv variable. ----
     userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]})
 
     const User = mongoose.model("User", userSchema);
