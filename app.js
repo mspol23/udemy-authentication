@@ -1,9 +1,11 @@
-require('dotenv').config(); // call .env
+require('dotenv').config();
 const express = require("express");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const md5 = require('md5'); // md5 hash.
- 
+const bcrypt = require("bcrypt"); // bcrypt use
+
+const saltRounds = 10;
+
 const app = express()
 
 app.set("view engine", "ejs")
@@ -38,22 +40,28 @@ async function main() {
     })
     
     app.post("/register", async (req, res) => {
-        const user = req.body.username;
-        const pass = md5(req.body.password); // md5 hash
+        const myUser = req.body.username;
+        const myPassword = req.body.password;
 
-        const [checkUser] = await User.find({username: user});
+        const [checkUser] = await User.find({username: myUser});
         console.log(checkUser);
-        
+
         if (checkUser) {
-            return res.render("register", {checkUser: checkUser});
-        }
-        
-        const newUser = new User({
-            username: user,
-            password: pass
+                return res.render("register", {checkUser: checkUser});
+            };
+            
+            // bcrypt usage.
+            
+            bcrypt.hash(myPassword, saltRounds, async function(err, hash) {
+ 
+            const newUser = new User({
+                username: myUser,
+                password: hash
+            });
+            const saveComplete = await newUser.save()
+            console.log(saveComplete);
+
         });
-        const saveComplete = await newUser.save()
-        console.log(saveComplete) 
 
         res.redirect("/login");
     })
@@ -64,18 +72,26 @@ async function main() {
 
     app.post("/login", async (req, res) => {
         const myUser = req.body.username;
-        const myPassword = md5(req.body.password); // md5 hash.
+        const myPassword = req.body.password;
 
         const [callUser] = await User.find({username: myUser});
         console.log(callUser);
 
         if (callUser) {
+
             if (callUser.username === myUser) {
-                if (callUser.password === myPassword) {
-                    res.render("secrets")
-                } else {
-                    console.log("invalid password")
-                };
+
+                // bcrypt usage.
+
+                bcrypt.compare(myPassword, callUser.password, function(err, result) {
+
+                    if (result) {
+                        res.render("secrets")
+                    } else {
+                        console.log("invalid password")
+                    };
+                });
+
             } else {
                 console.log("Invalid user.")
             };
