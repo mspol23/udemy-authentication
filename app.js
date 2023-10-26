@@ -2,15 +2,29 @@ require('dotenv').config();
 const express = require("express");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt"); // bcrypt use
+const session = require('express-session');
+const passport = require("passport");
 
-const saltRounds = 10;
+// passport-local doesn't need to be explicit called as a constant and then required. Its used by passport-local-mongoose internally.
+const passportLocalMongoose = require("passport-local-mongoose");
 
-const app = express()
+const app = express();
 
 app.set("view engine", "ejs")
 app.use(express.static("public"));
 app.use(express.urlencoded({extended: true}));
+
+// add session as middleware.
+app.use(session({
+    secret: process.env.SECRET,
+    resave: false,
+    saveUninitialized: false, // true as default is deprecated. See https://www.npmjs.com/package/express-session.
+
+}));
+
+// add passport as middleware of express.
+app.use(passport.initialize());
+app.use(passport.session());
 
 main().catch(err => console.log(err));
 
@@ -23,81 +37,87 @@ async function main() {
                 type: String,
                 required: true,
             },
-            password: {
-                type: String,
-                required: true,
-            }
+            password: String
     });
+
+    // add passport-local-mongoose as plugin of mongoose.
+    userSchema.plugin(passportLocalMongoose);
 
     const User = mongoose.model("User", userSchema);
     
+    // add passport-local-mongoose methods.
+    passport.use(User.createStrategy());
+    passport.serializeUser(User.serializeUser());
+    passport.deserializeUser(User.deserializeUser());
+
     app.get("/", (req, res) => {
         res.render("home")
     });
 
     app.get("/register", (req, res) => {
+        
         res.render("register")
     })
     
     app.post("/register", async (req, res) => {
-        const myUser = req.body.username;
-        const myPassword = req.body.password;
-
-        const [checkUser] = await User.find({username: myUser});
-        console.log(checkUser);
-
-        if (checkUser) {
-                return res.render("register", {checkUser: checkUser});
-            };
-            
-            // bcrypt usage.
-            
-            bcrypt.hash(myPassword, saltRounds, async function(err, hash) {
- 
-            const newUser = new User({
-                username: myUser,
-                password: hash
-            });
-            const saveComplete = await newUser.save()
-            console.log(saveComplete);
-
+        User.register({username: req.body.username}, req.body.password, async function(err, user) {
+            if (err) {
+                console.log(err);
+                return res.redirect("/register");
+            }
+            console.log(user);
         });
+        // try {
 
-        res.redirect("/login");
+        //     const newUser = new User({username: req.body.username});
+        //     await newUser.setPassword(req.body.password);
+        //     await newUser.save();
+        //     console.log(newUser);
+        //     res.redirect("/login")
+
+        // } catch(err) {
+
+        //     console.log(err)
+        // }
     })
     
     app.get("/login", (req, res) => {
         res.render("login")
     });
 
-    app.post("/login", async (req, res) => {
-        const myUser = req.body.username;
-        const myPassword = req.body.password;
+    app.post("/login", passport.authenticate("local", {failureRedirect: "/login"}), function(req, res) {
+        res.redirect("/secrets")
+    });
+    // async (req, res) => {
+    //     // try {
+    //     //     const {user} = await User.authenticate()(req.body.username, req.body.password);
+    //     //     console.log(user)
+    //     //     if (user) {
+    //     //         passport.authenticate('local', { failureRedirect: '/login' });
+    //     //         return res.render("secrets")
+    //     //     };
+    //     //     if (!user) {return res.redirect("/login")};
+    //     // } catch(err) {
+    //     //     console.log(err)
+    //     // }
+    // });
 
-        const [callUser] = await User.find({username: myUser});
-        console.log(callUser);
+    app.get("/secrets", (req, res) => {
 
-        if (callUser) {
-
-            if (callUser.username === myUser) {
-
-                // bcrypt usage.
-
-                bcrypt.compare(myPassword, callUser.password, function(err, result) {
-
-                    if (result) {
-                        res.render("secrets")
-                    } else {
-                        console.log("invalid password")
-                    };
-                });
-
-            } else {
-                console.log("Invalid user.")
-            };
+        if(req.isAuthenticated()) {
+            res.render("secrets");
         } else {
-            console.log ("Invalid user.")
+            res.redirect("/login");
         };
+    });
+
+    app.get("/logout", function(req, res, next) {
+        
+        req.logout(function(err) {
+            if (err) { return next(err); };
+            res.redirect("/");
+        });
+        
     });
 
 }
