@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const session = require('express-session');
 const passport = require("passport");
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const FacebookStrategy = require("passport-facebook");
 const findOrCreate = require('mongoose-findorcreate');
 
 // passport-local doesn't need to be explicit called as a constant and then required. Its used by passport-local-mongoose internally.
@@ -38,6 +39,7 @@ async function main() {
     const userSchema = new mongoose.Schema({
             username: String,
             googleId: String,
+            facebookId: String,
             password: String
     });
 
@@ -62,6 +64,7 @@ async function main() {
         });
     });
 
+    // Login with Google.
     passport.use(new GoogleStrategy({
         clientID: process.env["CLIENT_ID"],
         clientSecret: process.env["CLIENT_SECRET_KEY"],
@@ -74,7 +77,21 @@ async function main() {
         });
       }
     ));
+
+    // Login with Facebook
+    passport.use(new FacebookStrategy({
+        clientID: process.env.FACEBOOK_ID,
+        clientSecret: process.env.FACEBOOK_SECRET,
+        callbackURL: "http://localhost:3000/auth/facebook/secrets"
+      },
+      function(accessToken, refreshToken, profile, cb) {
+        User.findOrCreate({ facebookId: profile.id }, function (err, user) {
+          return cb(err, user);
+        });
+      }
+    ));
     
+    // Routes.
     app.get("/", (req, res) => { res.render("home") });
 
     app.get('/auth/google', passport.authenticate('google', { scope: ['profile'] }));
@@ -83,6 +100,16 @@ async function main() {
     function(req, res) {
         res.redirect("/secrets")
     });
+
+    app.get('/auth/facebook',
+        passport.authenticate('facebook'));
+
+    app.get('/auth/facebook/secrets',
+        passport.authenticate('facebook', { failureRedirect: '/login' }),
+        function(req, res) {
+            // Successful authentication, redirect home.
+            res.redirect('/secrets');
+        });
 
     app.get("/register", (req, res) => { res.render("register") });
     
